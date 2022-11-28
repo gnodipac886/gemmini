@@ -31,6 +31,7 @@ abstract class Arithmetic[T <: Data] {
 abstract class ArithmeticOps[T <: Data](self: T) {
   def *(t: T): T
   def mac(m1: T, m2: T): T // Returns (m1 * m2 + self)
+  def two_mac(m1: T, m2: T): T // 2 bit MAC
   def +(t: T): T
   def >>(u: UInt): T // This is a rounding shift! Rounds away from 0
   def >(t: T): Bool
@@ -47,6 +48,19 @@ object Arithmetic {
     override implicit def cast(self: UInt) = new ArithmeticOps(self) {
       override def *(t: UInt) = self * t
       override def mac(m1: UInt, m2: UInt) = m1 * m2 + self
+      override def two_mac(m1: UInt, m2: UInt): UInt = { // add support for mul with 0 and 1 term mul
+        println(p"UNSIGNEDDDDDDDDD {m2.getWidth}")
+        var first_term = m2(m2.getWidth - 1, m2.getWidth >> 1)
+        var second_term = m2((m2.getWidth >> 1) - 1, 1)
+        var sign = m2(0)
+        if (sign == 1.U) {
+            return (m1 << first_term) - (m1 << second_term) + self
+        }
+        else {
+            return (m1 << first_term) + (m1 << second_term) + self
+        }
+      }
+
       override def +(t: UInt) = self + t
 
       override def >>(u: UInt) = {
@@ -88,6 +102,46 @@ object Arithmetic {
     override implicit def cast(self: SInt) = new ArithmeticOps(self) {
       override def *(t: SInt) = self * t
       override def mac(m1: SInt, m2: SInt) = m1 * m2 + self
+      // override def two_mac(m1: SInt, m2: SInt) = m1 * m2 + self
+      // override def two_mac(m1: SInt, m2: SInt): SInt = { // add support for mul with 0 and 1 term mul
+      //   println(p"SIGNEDDDDDDDDD, {m2.getWidth}")
+      //   // var first_term = m2(m2.getWidth - 1, m2.getWidth >> 1)
+      //   // var second_term = m2((m2.getWidth >> 1) - 1, 1)
+      //   var temp_result = (m1.asUInt << (m2 & 8.S).asUInt) + (m1.asUInt << (m2 & 4.S).asUInt) + (m1.asUInt << (m2 & 2.S).asUInt) + (m1.asUInt << (m2 & 1.S).asUInt)
+      //   var result_is_neg = m1(m1.getWidth - 1) ^ m2(3)
+      //   if (result_is_neg == 0.S) {
+      //     return temp_result.asSInt
+      //   }
+      //   else {
+      //     return (~temp_result).asSInt + 1.S
+      //   }
+      // }
+      override def two_mac(m1: SInt, m2: SInt): SInt = { // add support for mul with 0 and 1 term mul
+        println(p"SIGNEDDDDDDDDD, {m2.getWidth}")
+        // var first_term = m2(m2.getWidth - 1, m2.getWidth >> 1)
+        // var second_term = m2((m2.getWidth >> 1) - 1, 1)
+        var first_term = UInt(4.W)
+        first_term = m2(5, 3)
+
+        var second_term = UInt(4.W)
+        second_term = m2(2, 0)
+
+        var is_one_term = UInt(1.W)
+        is_one_term = m2(6)
+
+        var sign = UInt(1.W)
+        sign = m2(7)
+
+        if (is_one_term == "b1".U(1.W)) {
+            return m1 << first_term
+        }
+        if (sign == "b1".U(1.W)) {
+            return (m1 << first_term) - (m1 << second_term) + self
+        }
+        else {
+            return (m1 << first_term) + (m1 << second_term) + self
+        }
+      }
       override def +(t: SInt) = self + t
 
       override def >>(u: UInt) = {
@@ -198,6 +252,11 @@ object Arithmetic {
         val out = Wire(Float(self.expWidth, self.sigWidth))
         out.bits := fNFromRecFN(self.expWidth, self.sigWidth, muladder.io.out)
         out
+      }
+
+      override def two_mac(m1: Float, m2: Float): Float = {
+        println("WHYYYYY FLOATS???????")
+        return Float(28, 4)
       }
 
       override def +(t: Float): Float = {
@@ -378,6 +437,7 @@ object Arithmetic {
     override implicit def cast(self: DummySInt) = new ArithmeticOps(self) {
       override def *(t: DummySInt) = self.dontCare
       override def mac(m1: DummySInt, m2: DummySInt) = self.dontCare
+      override def two_mac(m1: DummySInt, m2: DummySInt): DummySInt = self.dontCare
       override def +(t: DummySInt) = self.dontCare
       override def >>(t: UInt) = self.dontCare
       override def >(t: DummySInt): Bool = false.B

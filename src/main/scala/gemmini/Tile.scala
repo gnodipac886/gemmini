@@ -39,7 +39,7 @@ class Tile[T <: Data](inputType: T, outputType: T, accType: T, df: Dataflow.Valu
 
   import ev._
 
-  val tile = Seq.fill(rows, columns)(Module(new PE(inputType, outputType, accType, df, max_simultaneous_matmuls)))
+  val tile = Seq.fill(rows, columns)(Module(new PE_BLACKBOX(inputType, outputType, accType, df, max_simultaneous_matmuls)))
   val tileT = tile.transpose
 
   // TODO: abstract hori/vert broadcast, all these connections look the same

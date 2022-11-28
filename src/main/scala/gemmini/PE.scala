@@ -3,6 +3,7 @@ package gemmini
 
 import chisel3._
 import chisel3.util._
+import chisel3.util.HasBlackBoxResource
 
 class PEControl[T <: Data : Arithmetic](accType: T) extends Bundle {
   val dataflow = UInt(1.W) // TODO make this an Enum
@@ -11,12 +12,43 @@ class PEControl[T <: Data : Arithmetic](accType: T) extends Bundle {
 
 }
 
+// class PE_BLACKBOX[T <: Data](inputType: T, outputType: T, accType: T, df: Dataflow.Value, max_simultaneous_matmuls: Int)
+//                    (implicit ev: Arithmetic[T]) extends BlackBox with HasBlackBoxResource {
+//   import ev._
+
+//   val io = IO(new Bundle {
+//     val in_a = Input(inputType)
+//     val in_b = Input(outputType)
+//     val in_d = Input(outputType)
+//     val out_a = Output(inputType)
+//     val out_b = Output(outputType)
+//     val out_c = Output(outputType)
+
+//     val in_control = Input(new PEControl(accType))
+//     val out_control = Output(new PEControl(accType))
+
+//     val in_id = Input(UInt(log2Up(max_simultaneous_matmuls).W))
+//     val out_id = Output(UInt(log2Up(max_simultaneous_matmuls).W))
+
+//     val in_last = Input(Bool())
+//     val out_last = Output(Bool())
+
+//     val in_valid = Input(Bool())
+//     val out_valid = Output(Bool())
+
+//     val bad_dataflow = Output(Bool())
+//   })
+
+//   addResource("./vsrc/full_mul.sv")
+
+// }
+
 // TODO update documentation
 /**
   * A PE implementing a MAC operation. Configured as fully combinational when integrated into a Mesh.
   * @param width Data width of operands
   */
-class PE[T <: Data](inputType: T, outputType: T, accType: T, df: Dataflow.Value, max_simultaneous_matmuls: Int)
+class PE_BLACKBOX[T <: Data](inputType: T, outputType: T, accType: T, df: Dataflow.Value, max_simultaneous_matmuls: Int)
                    (implicit ev: Arithmetic[T]) extends Module { // Debugging variables
   import ev._
 
@@ -82,22 +114,22 @@ class PE[T <: Data](inputType: T, outputType: T, accType: T, df: Dataflow.Value,
     when(prop === PROPAGATE) {
       io.out_c := (c1 >> shift_offset).clippedToWidthOf(outputType)
       io.out_b := b
-      c2 := c2.mac(a, b.asTypeOf(inputType))
+      c2 := c2.two_mac(a, b.asTypeOf(inputType)) // in OS mode c2 holds the output and acculumates to it
       c1 := d.withWidthOf(cType)
     }.otherwise {
       io.out_c := (c2 >> shift_offset).clippedToWidthOf(outputType)
       io.out_b := b
-      c1 := c1.mac(a, b.asTypeOf(inputType))
+      c1 := c1.two_mac(a, b.asTypeOf(inputType))
       c2 := d.withWidthOf(cType)
     }
   }.elsewhen ((df == Dataflow.WS).B || ((df == Dataflow.BOTH).B && dataflow === WEIGHT_STATIONARY)) {
     when(prop === PROPAGATE) {
       io.out_c := c1
-      io.out_b := b.mac(a, c2.asTypeOf(inputType))
+      io.out_b := b.two_mac(a, c2.asTypeOf(inputType)) // in WS mode, c2 holds the weight, b is the accumulated result
       c1 := d
     }.otherwise {
       io.out_c := c2
-      io.out_b := b.mac(a, c1.asTypeOf(inputType))
+      io.out_b := b.two_mac(a, c1.asTypeOf(inputType))
       c2 := d
     }
   }.otherwise {
