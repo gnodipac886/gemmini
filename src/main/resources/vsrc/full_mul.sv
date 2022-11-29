@@ -164,6 +164,7 @@ module two_mac #(
 );
 
 	assign acc = m1 * m2 + self;
+	// assign acc = (m1 << m2[0]) + (m1 << (m2[1] << m2 & 4'b0010)) + (m1 << (m2[2] << m2 & 4'b0100)) + (m1 << (m2[3] << m2 & 4'b1000)) + (self)
 	// logic [2:0] first_term, second_term;
 	// logic is_one_term;
 	// logic sign;
